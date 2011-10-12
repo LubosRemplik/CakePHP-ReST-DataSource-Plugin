@@ -121,10 +121,10 @@ class RestSource extends DataSource {
 
     // Decode response according to content type
     switch ($contentType) {
-    	case 'application/xml':
-      case 'text/xml':
-    	case 'application/atom+xml':
-    	case 'application/rss+xml':
+		case 'application/xml':
+		case 'text/xml':
+		case 'application/atom+xml':
+		case 'application/rss+xml':
         // If making multiple requests that return xml, I found that using the
         // same Xml object with Xml::load() to load new responses did not work,
         // consequently it is necessary to create a whole new instance of the

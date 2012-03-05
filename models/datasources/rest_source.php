@@ -22,6 +22,10 @@ class RestSource extends DataSource {
    * @var HttpSocket
    */
   public $Http = null;
+  
+  public $useCache = false;
+  
+  public $cacheUri = '';
 
   /**
    * Loads HttpSocket class
@@ -36,6 +40,7 @@ class RestSource extends DataSource {
       $Http = new HttpSocket();
     }
     $this->Http = $Http;
+    $this->cacheEnabled();	
   }
 
   /**
@@ -102,36 +107,42 @@ class RestSource extends DataSource {
       $request = $model;
     } elseif (is_string($model)) {
       $request = array('uri' => $model);
+    }	
+	
+    if($this->useCache && @$response === $this->hasCache($request['uri'])){
+        return $response;
     }
-
+    
     // Remove unwanted elements from request array
     $request = array_intersect_key($request, $this->Http->request);
 
     // Issues request
     $response = $this->Http->request($request);
-
+    
+    //check response
+    if(!$response){return false;}
+    
     // Get content type header
     $contentType = $this->Http->response['header']['Content-Type'];
-
     // Extract content type from content type header
     if (preg_match('/^([a-z0-9\/\+]+);\s*charset=([a-z0-9\-]+)/i', $contentType, $matches)) {
       $contentType = $matches[1];
       $charset = $matches[2];
     }
-
     // Decode response according to content type
     switch ($contentType) {
 		case 'application/xml':
 		case 'text/xml':
 		case 'application/atom+xml':
 		case 'application/rss+xml':
+
         // If making multiple requests that return xml, I found that using the
         // same Xml object with Xml::load() to load new responses did not work,
         // consequently it is necessary to create a whole new instance of the
         // Xml class. This can use a lot of memory so we have to manually
         // garbage collect the Xml object when we've finished with it, i.e. got
         // it to transform the xml string response into a php array.
-    	  App::import('Core', 'Xml');
+		App::import('Core', 'Xml');
       	$Xml = new Xml($response);
       	$response = $Xml->toArray(false); // Send false to get separate elements
         $Xml->__destruct();
@@ -155,10 +166,37 @@ class RestSource extends DataSource {
       }
       return false;
     }
-
+    
+    //Cache the request
+    if($this->useCache){
+		$this->cacheResponse($response);        
+    }
     return $response;
 
   }
-
+    /**
+    * Check if the source is to be cached and a cached version exists
+    * @param String $uri request url
+    * @return array cached results
+    */
+    function hasCache($uri){
+		$this->cacheUri = md5($uri);
+		if(@$response === Cache::read( $this->cacheUri, 'restsource_cache' )){
+			return $response;
+		}
+		return false;
+    }
+	function cacheEnabled(){
+		if(Configure::read('Cache.disable') === false && Configure::read('Cache.check') === true && isset($this->config['cache']) && $this->config['cache'] !== false){
+			$this->useCache = true;
+		}
+	}
+	function cacheResponse( $response ){
+		Cache::config('restsource_cache', array(
+			'duration'	=> $this->config['cache'],
+			'prefix'	=> 'rest_' . $this->config['datasource'] . '_'
+		));			
+		Cache::write($this->cacheUri, $response, 'restsource_cache');
+	}
 }
 ?>

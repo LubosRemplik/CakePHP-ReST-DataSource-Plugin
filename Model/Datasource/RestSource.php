@@ -1,6 +1,6 @@
 <?php
 
-App::uses('DataSource', 'Model/DataSource');
+App::uses('DataSource', 'Model/Datasource');
 
 /**
  * DataSource for interacting with REST APIs
